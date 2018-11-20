@@ -6,15 +6,23 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
-func getHttpReq() {
 
+type Good struct {
+	Abiid        int
+	Mainname     string
+	Subtitle     string
+	Brandname    string
+	Categoryname string
+	Price        int
+	Stock        string
 }
-
 
 func GetToken() string{
 	// python的函数，改成go
@@ -51,18 +59,7 @@ func GetToken() string{
 	signature := hex.EncodeToString(cipherStr)
 	data := fmt.Sprintf("{\"appid\": \"%s\", \"appsecret\": \"%s\", \"timestamp\": \"%s\", \"signature\": \"%s\", \"nonce\": \"%s\"}",
 		appid, appsecret, timestamp, strings.ToUpper(signature), nonce)
-	//req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(data)))
-	//	//req.Header.Set("Content-Type", "application/json")
-	//	//client := &http.Client{}
-	//	//
-	//	//response, _ := client.Do(req)
-	//	//defer response.Body.Close()
-	//	//
-	//    //body, _ := ioutil.ReadAll(response.Body)
-	//    //fmt.Println(string(body))
-	//	//jsonData, _ := simplejson.NewJson(body)
 	jsonData, _ := GetJsonData(url, "POST", map[string]string{"Content-Type": "application/json"}, data)
-
 	token, _ := 	jsonData.Get("data").Get("token").String()
   	return 	token
 }
@@ -100,26 +97,63 @@ func GetPcategorys(categoryChan chan string) {
 	}
 }
 
-func MakeCategoryPage(categoryChan chan string, urlChan chan string) {
+func MakeCategoryPage(categoryChan chan string, urlChan chan [2]string) {
 	for {
-		categoryId := <- categoryChan
-		fmt.Println("is me make")
-		for i := 1; i < 100; i ++ {
-			url := fmt.Sprintf("http://srmemberapp.srgow.com/goods/search/%d?a=a&key=&category=%s", i, categoryId)
-			fmt.Println(url)
-			urlChan <- url
-		}
+		    categoryId := <- categoryChan
+		    urlArr := [2]string{"1", categoryId}
+		    urlChan <- urlArr
 	}
-
 }
 
-func GetOnePageGoods(urlChan chan string) {
+func makeUrl(urlArr [2]string) string{
+	return fmt.Sprintf("http://srmemberapp.srgow.com/goods/search/%s?a=a&key=&category=%s",urlArr[0], urlArr[1])
+}
+
+func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string) {
 	for {
 		fmt.Println("还剩", len(urlChan), "个url")
-		token := GetToken()
+		urlArr := <- urlChan
 		headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
-		datas, _ := GetJsonData(<- urlChan, "GET", headers, "")
-		//abbid, _ := datas.Get("data").String()
-		fmt.Println(datas.Get("data").GetIndex(0))
+		datas, _ := GetJsonData(makeUrl(urlArr), "GET", headers, "")
+		goods, _ := datas.Get("data").Array()
+		goodsCount := len(goods)
+		if goodsCount == 20{
+			page, _ := strconv.Atoi(urlArr[0])
+			if page % 10 == 1 {
+				fmt.Println("page", page)
+			    for i := 0; i < 10; i ++ {
+			    	page = page + 1
+					urlChan <- [2]string{strconv.Itoa(page + 1), urlArr[1]}
+				}
+			}
+		}
+		for i := 0; i < goodsCount; i ++ {
+			good := datas.Get("data").GetIndex(i)
+			mainname, _ := good.Get("mainname").String()
+			abiid, _ := good.Get("abiid").Int()
+			subtitle, _ := good.Get("subtitle").String()
+			brandname, _ := good.Get("brandname").String()
+			categoryname, _ := good.Get("categoryname").String()
+			price, _ := good.Get("price").Int()
+			stock, _ := good.Get("stock").String()
+			Gooda := Good{abiid, mainname, subtitle, brandname, categoryname, price, stock}
+			goodChan <- Gooda
+			fmt.Println(Gooda)
+		}
+	}
+}
+
+func DomToFile(goodChan chan Good, filename string) {
+	for {
+		//select {
+		//case goodArr := <-:
+		//
+		//}
+		good := <-goodChan
+		fmt.Println("还剩", len(goodChan), "个物品")
+		f, _ := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0755)
+		f.Seek(0, 2)
+		f.WriteString(strconv.Itoa(good.Abiid) + "\t" + good.Mainname + "\t" + strconv.Itoa(good.Price)+ "\t" + good.Stock + "\n")
+		defer f.Close()
 	}
 }
