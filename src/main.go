@@ -1,27 +1,31 @@
 package main
 
 import (
-	"net/http"
-	"spider"
-	"sync"
 	_ "net/http/pprof"
+	"spider"
 )
 
 func main() {
-	var wg sync.WaitGroup
-	categoriyChan := make(chan string, 99)
-	urlChan := make(chan [2]string, 10000)
-	goodChan := make(chan spider.Good, 10000)
-	wg.Add(12000)
-	token := spider.GetToken()
-	go spider.GetPcategorys(categoriyChan)
-    go spider.MakeCategoryPage(categoriyChan, urlChan)
-	for i := 0; i < 1000; i++ {
-		go spider.GetOnePageGoods(urlChan, goodChan, token)
-	}
-	go spider.DomToFile(goodChan, "good.txt")
-	go func(){
-		http.ListenAndServe(":6060",nil)
-	}()
-	wg.Wait()
+	//wg := new(sync.WaitGroup)
+	//categoryChan := make(chan string, 99)
+	//urlChan := make(chan [2]string, 100000)
+	//goodChan := make(chan spider.Good, 100000)
+	//token := spider.GetToken()
+	//wg.Add(1)
+	//go spider.GetPcategorys(categoryChan, wg)
+	//wg.Add(1)
+    //go spider.MakeCategoryPage(categoryChan, urlChan,wg)
+	//for i := 0; i < 100; i++ {
+	//	wg.Add(1)
+	//	go spider.GetOnePageGoods(urlChan, goodChan, token, wg)
+	//}
+	//wg.Add(1)
+	//go spider.DomToFile(goodChan, "good.csv", wg)
+	////wg.Add(100)
+	////go func(){
+	////	http.ListenAndServe(":6060",nil)
+	////}()
+	//wg.Wait()
+	//fmt.Println("exit")
+	spider.InitDB()
 }

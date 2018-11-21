@@ -2,15 +2,17 @@ package spider
 
 import (
 	"crypto/md5"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 
@@ -64,28 +66,17 @@ func GetToken() string{
   	return 	token
 }
 
-func MakeTokenHeader(r http.Request) http.Request{
-	//def make_token_headers(self):
-	//headers = self.headers.copy()
-	//token = self.get_token()
-	//headers["Authorization"] = "Bearer {}".format(token)
-	//return headers
-	token := GetToken()
-	r.Header.Set("Authorization", "Bearer " + token)
-	return r
-}
-
-func GetPcategorys(categoryChan chan string) {
+func GetPcategorys(categoryChan chan string, wg *sync.WaitGroup) {
 	//def get_pcategorys(self):
 	//url = "http://srmemberapp.srgow.com/goods/pcategorys/"
 	//datas = self.get_data(url)
 	//for data in datas:
 	//yield data.get('id'), data.get('name')
+	defer wg.Done()
 	url := "http://srmemberapp.srgow.com/goods/pcategorys/"
 	token := GetToken()
 	headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
 	datas, _ := GetJsonData(url, "GET", headers, "")
-
 	itemsCount, _ := datas.Get("data").Array()
 	for i := 0; i < len(itemsCount); i ++ {
 		item := datas.Get("data").GetIndex(i)
@@ -95,24 +86,47 @@ func GetPcategorys(categoryChan chan string) {
 		}
 		categoryChan <- categoryId
 	}
+	defer close(categoryChan)
 }
 
-func MakeCategoryPage(categoryChan chan string, urlChan chan [2]string) {
-	for {
-		    categoryId := <- categoryChan
-		    urlArr := [2]string{"1", categoryId}
-		    urlChan <- urlArr
+func MakeCategoryPage(categoryChan chan string, urlChan chan [2]string, wg *sync.WaitGroup) {
+	for{
+		var categoryId string
+		select {
+		    case categoryId = <- categoryChan:
+		    	//
+		    case <- time.After(time.Second):
+		    	categoryId = ""
+		}
+		if categoryId == ""{
+			break
+		}
+		urlArr := [2]string{"1", categoryId}
+		urlChan <- urlArr
 	}
+	defer wg.Done()
 }
 
 func makeUrl(urlArr [2]string) string{
 	return fmt.Sprintf("http://srmemberapp.srgow.com/goods/search/%s?a=a&key=&category=%s",urlArr[0], urlArr[1])
 }
 
-func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string) {
+func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
-		fmt.Println("还剩", len(urlChan), "个url")
-		urlArr := <- urlChan
+		var urlArr [2]string
+		select {
+		    case urlArr = <- urlChan:
+		    	//
+		    case <- time.After(time.Second):
+		    	fmt.Println("no url")
+		        urlArr[0] = ""
+		}
+		if urlArr[0] == "" {
+			break
+		}
+		// urlArr := <- urlChan
+		//fmt.Println("还剩", len(urlChan), "个url")
 		headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
 		datas, _ := GetJsonData(makeUrl(urlArr), "GET", headers, "")
 		goods, _ := datas.Get("data").Array()
@@ -138,22 +152,84 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string) {
 			stock, _ := good.Get("stock").String()
 			Gooda := Good{abiid, mainname, subtitle, brandname, categoryname, price, stock}
 			goodChan <- Gooda
-			fmt.Println(Gooda)
+			//fmt.Println(Gooda)
 		}
 	}
 }
 
-func DomToFile(goodChan chan Good, filename string) {
+func DomToFile(goodChan chan Good, filename string, wg *sync.WaitGroup) {
+	f, _ := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0755)
+	for{
+		//select {
+		//case goodArr := <-:
+		//
+		//}
+		var good Good
+		sign := false
+		select {
+		    case good = <-goodChan:
+		    	//
+		    case <- time.After(time.Second * 5):
+		    	fmt.Println("no goods")
+		    	sign = true
+		}
+		if sign {
+			break
+		}
+		//fmt.Println("还剩", len(goodChan), "个物品")
+		f.Seek(0, 2)
+		f.WriteString(strconv.Itoa(good.Abiid) + "," + good.Mainname + "," + strconv.Itoa(good.Price)+ "," + good.Stock + "\n")
+	}
+	defer wg.Done()
+	defer f.Close()
+    defer close(goodChan)
+}
+
+func DomToDB(db *sql.DB, goodChan chan Good, wg *sync.WaitGroup) {
 	for {
 		//select {
 		//case goodArr := <-:
 		//
 		//}
-		good := <-goodChan
-		fmt.Println("还剩", len(goodChan), "个物品")
-		f, _ := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0755)
-		f.Seek(0, 2)
-		f.WriteString(strconv.Itoa(good.Abiid) + "\t" + good.Mainname + "\t" + strconv.Itoa(good.Price)+ "\t" + good.Stock + "\n")
-		defer f.Close()
+		var good Good
+		sign := false
+		select {
+		case good = <-goodChan:
+			//
+		case <-time.After(time.Second * 5):
+			fmt.Println("no goods")
+			sign = true
+		}
+		if sign {
+			break
+		}
+		sql = `insert or replace into Book
+               (ID, Name, TypeID, Level, Seen)
+                values
+                (
+                (select ID from Book where Name = "SearchName"),
+                "SearchName",
+                 5,
+                 6,
+                 (select Seen from Book where Name = "SearchName")
+                 );`
+		statement, _ := db.Prepare()
 	}
+
+}
+
+func InitDB() *sql.DB{
+	db, err := sql.Open("sqlite3", "good.db")
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS good (abiid INT PRIMARY KEY NOT NULL, mainname VARCHAR(64), price INT NOT NULL , stock VARCHAR(12) NOT NULL)")
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	statement.Exec()
+	if err != nil {
+		fmt.Println(err)
+	}
+	return db
 }
