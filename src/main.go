@@ -1,10 +1,10 @@
 package main
 
 import (
-	_ "net/http/pprof"
-	"sync"
-	"spider"
 	"fmt"
+	_ "net/http/pprof"
+	"spider"
+	"sync"
 	"time"
 )
 
@@ -25,7 +25,9 @@ func main() {
 		go spider.GetOnePageGoods(urlChan, goodChan, token, wg)
 	}
 	wg.Add(1)
-	go spider.DomToDB(goodChan, wg)
+	go spider.DomToXlsx(goodChan, "good.xlsx", wg)
+	//wg.Add(1)
+	//go spider.DomToDB(goodChan, wg)
 	//wg.Add(1)
 	//go spider.DomToFile(goodChan, "good.csv", wg)
 	//wg.Add(100)
@@ -35,5 +37,4 @@ func main() {
 	wg.Wait()
 	fmt.Println("exit")
 	fmt.Println(time.Now())
-
 }

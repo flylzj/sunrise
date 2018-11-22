@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"github.com/tealeg/xlsx"
 	"math/rand"
 	"os"
 	"sort"
@@ -118,7 +119,7 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string, w
 		select {
 		case urlArr = <- urlChan:
 			//
-		case <- time.After(time.Second):
+		case <- time.After(time.Second * 2):
 			fmt.Println("no url")
 			urlArr[0] = ""
 		}
@@ -232,5 +233,58 @@ func InitDB() *sql.DB{
 	}
 	fmt.Println("init db success")
 	return db
+}
+
+func DomToXlsx(goodChan chan Good, filename string, wg *sync.WaitGroup) {
+	var file *xlsx.File
+	var sheet *xlsx.Sheet
+	var row *xlsx.Row
+	var cell *xlsx.Cell
+	var err error
+
+	file = xlsx.NewFile()
+	sheet, err = file.AddSheet("Sheet1")
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	row = sheet.AddRow()
+	cell = row.AddCell()
+	cell.Value = "abiid"
+	cell = row.AddCell()
+	cell.Value = "商品名"
+	cell = row.AddCell()
+	cell.Value = "商品价格"
+	cell = row.AddCell()
+	cell.Value = "库存"
+	for{
+		var good Good
+		sign := false
+		select {
+		case good = <-goodChan:
+			//
+		case <- time.After(time.Second * 5):
+			fmt.Println("no goods")
+			sign = true
+		}
+		if sign {
+			break
+		}
+		fmt.Println("还剩", len(goodChan), "个物品")
+		row = sheet.AddRow()
+		cell = row.AddCell()
+		cell.Value = strconv.Itoa(good.Abiid)
+		cell = row.AddCell()
+		cell.Value = good.Mainname
+		cell = row.AddCell()
+		cell.Value = strconv.Itoa(good.Price)
+		cell = row.AddCell()
+		cell.Value = good.Stock
+	}
+	err = file.Save(filename)
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	defer wg.Done()
+	//defer close(goodChan)
 }
 
