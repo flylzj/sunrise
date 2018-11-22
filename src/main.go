@@ -5,15 +5,16 @@ import (
 	"sync"
 	"spider"
 	"fmt"
+	"time"
 )
 
 func main() {
+	fmt.Println(time.Now())
 	spider.InitDB()
 	wg := new(sync.WaitGroup)
 	categoryChan := make(chan string, 99)
 	urlChan := make(chan [2]string, 100000)
 	goodChan := make(chan spider.Good, 100000)
-	fmt.Println("lock")
 	token := spider.GetToken()
 	wg.Add(1)
 	go spider.GetPcategorys(categoryChan, wg)
@@ -33,5 +34,6 @@ func main() {
 	//}()
 	wg.Wait()
 	fmt.Println("exit")
+	fmt.Println(time.Now())
 
 }

@@ -116,11 +116,11 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string, w
 	for {
 		var urlArr [2]string
 		select {
-		    case urlArr = <- urlChan:
-		    	//
-		    case <- time.After(time.Second):
-		    	fmt.Println("no url")
-		        urlArr[0] = ""
+		case urlArr = <- urlChan:
+			//
+		case <- time.After(time.Second):
+			fmt.Println("no url")
+			urlArr[0] = ""
 		}
 		if urlArr[0] == "" {
 			break

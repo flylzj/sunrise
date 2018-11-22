@@ -1,3 +1,5 @@
 .idea
 good.txt
 pkg
+*.db
+github.com
