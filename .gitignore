@@ -4,3 +4,4 @@ pkg
 *.db
 github.com
 *.xlsx
+*.exe
