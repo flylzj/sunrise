@@ -2,30 +2,17 @@ package spider
 
 import (
 	"crypto/md5"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/tealeg/xlsx"
+	_ "github.com/mattn/go-sqlite3"
 	"math/rand"
-	"os"
+	"model"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	_ "github.com/mattn/go-sqlite3"
 )
-
-
-type Good struct {
-	Abiid        int
-	Mainname     string
-	Subtitle     string
-	Brandname    string
-	Categoryname string
-	Price        int
-	Stock        string
-}
 
 func GetToken() string{
 	// python的函数，改成go
@@ -63,7 +50,7 @@ func GetToken() string{
 	data := fmt.Sprintf("{\"appid\": \"%s\", \"appsecret\": \"%s\", \"timestamp\": \"%s\", \"signature\": \"%s\", \"nonce\": \"%s\"}",
 		appid, appsecret, timestamp, strings.ToUpper(signature), nonce)
 	jsonData, _ := GetJsonData(url, "POST", map[string]string{"Content-Type": "application/json"}, data)
-	token, _ := 	jsonData.Get("data").Get("token").String()
+	token, _ := jsonData.Get("data").Get("token").String()
   	return 	token
 }
 
@@ -112,7 +99,7 @@ func makeUrl(urlArr [2]string) string{
 	return fmt.Sprintf("http://srmemberapp.srgow.com/goods/search/%s?a=a&key=&category=%s",urlArr[0], urlArr[1])
 }
 
-func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string, wg *sync.WaitGroup) {
+func GetOnePageGoods(urlChan chan [2]string, goodChan chan model.Good, token string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		var urlArr [2]string
@@ -147,144 +134,48 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan Good, token string, w
 			mainname, _ := good.Get("mainname").String()
 			abiid, _ := good.Get("abiid").Int()
 			subtitle, _ := good.Get("subtitle").String()
+			brandid, _ := good.Get("brandid").String()
 			brandname, _ := good.Get("brandname").String()
+			categoryid, _ := good.Get("categoryid").String()
 			categoryname, _ := good.Get("categoryname").String()
 			price, _ := good.Get("price").Int()
 			stock, _ := good.Get("stock").String()
-			Gooda := Good{abiid, mainname, subtitle, brandname, categoryname, price, stock}
+			intStock, _ := good.Get("intstock").Int()
+			Gooda := model.Good{abiid, mainname, subtitle, brandid, brandname, categoryid, categoryname, price, stock, intStock}
 			goodChan <- Gooda
-			//fmt.Println(Gooda)
 		}
 	}
 }
 
-func DomToFile(goodChan chan Good, filename string, wg *sync.WaitGroup) {
-	f, _ := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0755)
-	for{
-		//select {
-		//case goodArr := <-:
-		//
-		//}
-		var good Good
-		sign := false
-		select {
-		    case good = <-goodChan:
-		    	//
-		    case <- time.After(time.Second * 5):
-		    	fmt.Println("no goods")
-		    	sign = true
-		}
-		if sign {
-			break
-		}
-		//fmt.Println("还剩", len(goodChan), "个物品")
-		f.Seek(0, 2)
-		f.WriteString(strconv.Itoa(good.Abiid) + "," + good.Mainname + "," + strconv.Itoa(good.Price)+ "," + good.Stock + "\n")
-	}
-	defer wg.Done()
-	defer f.Close()
-    defer close(goodChan)
+func GetAGood(abiid int, token string){
+	info := model.GoodPriceInfo{Abiid:abiid}
+	GetGoodInfo(abiid, token, &info)
+	GetGoodPrice(abiid, token, &info)
+	fmt.Println(info)
 }
 
-func DomToDB(goodChan chan Good, wg *sync.WaitGroup) {
-	sqlStr := fmt.Sprintf("INSERT OR REPLACE INTO good(abiid, mainname, price, stock) values")
-	for {
-		fmt.Println("还剩", len(goodChan), "个物品")
-		var good Good
-		sign := false
-		select {
-		case good = <-goodChan:
-			//
-		case <-time.After(time.Second * 5):  //因为网络延迟需要等待一定的时间才能确定是没有商品了
-			fmt.Println("no goods")
-			sign = true
-		}
-		if sign {
-			break
-		}
-
-		values := fmt.Sprintf("(%d, '%s', %d, '%s'),", good.Abiid, strings.Replace(good.Mainname, "'", "\"", -1), good.Price, good.Stock)
-		sqlStr += values
-	}
-	sqlStr = strings.Trim(sqlStr, ",") // 删掉sql末尾的逗号
-	db, _ := sql.Open("sqlite3", "good.db")
-	res, err := db.Exec(sqlStr)
-	if err != nil{
-		fmt.Println(err)
-	}
-	res.RowsAffected()
-	defer db.Close()
-	defer wg.Done()
+func GetGoodPrice(abiid int, token string, info *model.GoodPriceInfo){
+	url := fmt.Sprintf("http://srmemberapp.srgow.com/goods/prices/%d", abiid)
+	headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
+	data, _ := GetJsonData(url, "GET", headers, "")
+	data = data.Get("data")
+	realprice, _ := data.Get("realprice").Int()
+	price, _ := data.Get("price").Int()
+	stock, _ := data.Get("stock").String()
+	num, _ := data.Get("num").Int()
+	info.RealPrice = realprice
+	info.Price = price
+	info.Stock = stock
+	info.Num = num
+	fmt.Println(realprice, price, stock, num)
 }
 
-func InitDB() *sql.DB{
-	db, err := sql.Open("sqlite3", "good.db")
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	db.Exec("DROP TABLE IF EXISTS good")
-	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS good (abiid INT PRIMARY KEY NOT NULL, mainname VARCHAR(64), price INT NOT NULL , stock VARCHAR(12) NOT NULL)")
-	if err != nil {
-		fmt.Println("err", err)
-	}
-	statement.Exec()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("init db success")
-	return db
-}
+func GetGoodInfo(abiid int, token string, info *model.GoodPriceInfo){
+	url := fmt.Sprintf("http://b2carticleinfo.lib.cdn.srgow.com/api/v1/Article?languageid=1&abiid=%d", abiid)
+	headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
+	data, _ := GetJsonData(url, "GET", headers, "")
+	mainname, _ := data.Get("mainname").String()
+	info.Mainname = mainname
 
-func DomToXlsx(goodChan chan Good, filename string, wg *sync.WaitGroup) {
-	var file *xlsx.File
-	var sheet *xlsx.Sheet
-	var row *xlsx.Row
-	var cell *xlsx.Cell
-	var err error
-
-	file = xlsx.NewFile()
-	sheet, err = file.AddSheet("Sheet1")
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	row = sheet.AddRow()
-	cell = row.AddCell()
-	cell.Value = "abiid"
-	cell = row.AddCell()
-	cell.Value = "商品名"
-	cell = row.AddCell()
-	cell.Value = "商品价格"
-	cell = row.AddCell()
-	cell.Value = "库存"
-	for{
-		var good Good
-		sign := false
-		select {
-		case good = <-goodChan:
-			//
-		case <- time.After(time.Second * 5):
-			fmt.Println("no goods")
-			sign = true
-		}
-		if sign {
-			break
-		}
-		fmt.Println("还剩", len(goodChan), "个物品")
-		row = sheet.AddRow()
-		cell = row.AddCell()
-		cell.Value = strconv.Itoa(good.Abiid)
-		cell = row.AddCell()
-		cell.Value = good.Mainname
-		cell = row.AddCell()
-		cell.Value = strconv.Itoa(good.Price)
-		cell = row.AddCell()
-		cell.Value = good.Stock
-	}
-	err = file.Save(filename)
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	defer wg.Done()
-	//defer close(goodChan)
 }
 

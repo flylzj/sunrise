@@ -12,6 +12,7 @@ func GetJsonData(url string, method string, headers map[string]string, body stri
 	fmt.Println(url)
 	req, _ := http.NewRequest(method, url, bytes.NewBuffer([]byte(body)))
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 4.4.2; HUAWEI MLA-AL10 Build/HUAWEIMLA-AL10) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/30.0.0.0 Mobile Safari/537.36 Html5Plus/1.0")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
