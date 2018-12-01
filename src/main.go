@@ -42,6 +42,10 @@ func getGoodsInfo(abiids []string) (infos []model.GoodPriceInfo) {
 }
 
 func main() {
-	abiids := domer.ReadXlsx("/home/lzj/1.xlsx")
-	getGoodsInfo(abiids)
+	abiids := domer.ReadXlsx("1.xlsx")
+	infos := getGoodsInfo(abiids)
+	domer.CreateTmpStockTable()
+	for _, info := range infos{
+		domer.DomTmpStock(info)
+	}
 }
