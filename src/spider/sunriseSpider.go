@@ -147,15 +147,15 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan model.Good, token str
 	}
 }
 
-func GetAGood(abiid int, token string){
+func GetAGood(abiid string, token string) model.GoodPriceInfo {
 	info := model.GoodPriceInfo{Abiid:abiid}
 	GetGoodInfo(abiid, token, &info)
 	GetGoodPrice(abiid, token, &info)
-	fmt.Println(info)
+	return info
 }
 
-func GetGoodPrice(abiid int, token string, info *model.GoodPriceInfo){
-	url := fmt.Sprintf("http://srmemberapp.srgow.com/goods/prices/%d", abiid)
+func GetGoodPrice(abiid string, token string, info *model.GoodPriceInfo){
+	url := fmt.Sprintf("http://srmemberapp.srgow.com/goods/prices/%s", abiid)
 	headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
 	data, _ := GetJsonData(url, "GET", headers, "")
 	data = data.Get("data")
@@ -170,12 +170,11 @@ func GetGoodPrice(abiid int, token string, info *model.GoodPriceInfo){
 	fmt.Println(realprice, price, stock, num)
 }
 
-func GetGoodInfo(abiid int, token string, info *model.GoodPriceInfo){
-	url := fmt.Sprintf("http://b2carticleinfo.lib.cdn.srgow.com/api/v1/Article?languageid=1&abiid=%d", abiid)
+func GetGoodInfo(abiid string, token string, info *model.GoodPriceInfo){
+	url := fmt.Sprintf("http://b2carticleinfo.lib.cdn.srgow.com/api/v1/Article?languageid=1&abiid=%s", abiid)
 	headers := map[string]string{"Accept": "application/json", "Authorization": "Bearer " + token}
 	data, _ := GetJsonData(url, "GET", headers, "")
 	mainname, _ := data.Get("mainname").String()
 	info.Mainname = mainname
-
 }
 

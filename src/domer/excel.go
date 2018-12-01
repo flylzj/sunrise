@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-)
+	)
 
 func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup) {
 	var file *xlsx.File
@@ -21,15 +21,6 @@ func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup) {
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
-	//Abiid        int
-	//Mainname     string
-	//Subtitle     string
-	//Brandid      int
-	//Brandname    string
-	//CategoryId   int
-	//Categoryname string
-	//Price        int
-	//Stock        string
 	row = sheet.AddRow()
 	cell = row.AddCell()
 	cell.Value = "abiid"
@@ -95,6 +86,16 @@ func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup) {
 	//defer close(goodChan)
 }
 
-func ReadXlsx(filename string){
+func ReadXlsx(filename string) (abiids []string){
+	xlFile, err := xlsx.OpenFile(filename)
+	if err != nil {
+		fmt.Println(err)
+	}
+	sheet := xlFile.Sheets[0]
+	for _, row := range sheet.Rows{
+		abiid := row.Cells[0]
+		abiids = append(abiids, abiid.Value)
+	}
+	return
 
 }

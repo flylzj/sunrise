@@ -15,7 +15,7 @@ type Good struct {
 }
 
 type GoodPriceInfo struct {
-	Abiid		int
+	Abiid		string
 	Mainname	string
 	Price		int
 	Stock		string
