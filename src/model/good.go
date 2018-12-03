@@ -21,4 +21,10 @@ type GoodPriceInfo struct {
 	Stock		string
 	RealPrice	int
 	Num         int
-} 
+	Num2		int
+}
+
+type EmailAccount struct {
+	Sender string
+	Pwd string
+}

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"github.com/tealeg/xlsx"
 	"model"
+	"os"
 	"strconv"
 	"sync"
 	"time"
-	)
+	"tk"
+)
 
-func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup) {
+func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup, root *tk.Root) {
 	var file *xlsx.File
 	var sheet *xlsx.Sheet
 	var row *xlsx.Row
@@ -47,9 +49,9 @@ func DomToXlsx(goodChan chan model.Good, filename string, wg *sync.WaitGroup) {
 		sign := false
 		select {
 		case good = <-goodChan:
-			//
+			//root.MessageChan <- [2]string{"output", "保存"+strconv.Itoa(good.Abiid)+"成功"}
 		case <- time.After(time.Second * 10):
-			fmt.Println("no goods")
+			root.MessageChan <- [2]string{"output", "导出完成"}
 			sign = true
 		}
 		if sign {
@@ -98,4 +100,33 @@ func ReadXlsx(filename string) (abiids []string){
 	}
 	return
 
+}
+
+func DomStockToExcel(filename string, infos []model.GoodPriceInfo){
+	os.Remove(filename)
+	file := xlsx.NewFile()
+	sheet, err := file.AddSheet("Sheet1")
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	row := sheet.AddRow()
+	row.AddCell().Value = "abiid"
+	row.AddCell().Value = "mainname"
+	row.AddCell().Value = "price"
+	row.AddCell().Value = "stock"
+	row.AddCell().Value = "num1"
+	row.AddCell().Value = "num2"
+	for _, info := range infos{
+		row = sheet.AddRow()
+		row.AddCell().Value = info.Abiid
+		row.AddCell().Value = info.Mainname
+		row.AddCell().Value = strconv.Itoa(info.Price)
+		row.AddCell().Value = info.Stock
+		row.AddCell().Value = strconv.Itoa(info.Num)
+		row.AddCell().Value = strconv.Itoa(info.Num2)
+	}
+	err = file.Save(filename)
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
 }

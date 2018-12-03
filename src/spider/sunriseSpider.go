@@ -106,7 +106,7 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan model.Good, token str
 		select {
 		case urlArr = <- urlChan:
 			//
-		case <- time.After(time.Second * 2):
+		case <- time.After(time.Second * 5):
 			fmt.Println("no url")
 			urlArr[0] = ""
 		}
@@ -147,11 +147,12 @@ func GetOnePageGoods(urlChan chan [2]string, goodChan chan model.Good, token str
 	}
 }
 
-func GetAGood(abiid string, token string) model.GoodPriceInfo {
+func GetAGood(abiid string, token string, infoChan chan model.GoodPriceInfo){
 	info := model.GoodPriceInfo{Abiid:abiid}
 	GetGoodInfo(abiid, token, &info)
 	GetGoodPrice(abiid, token, &info)
-	return info
+	fmt.Println(info)
+	infoChan <- info
 }
 
 func GetGoodPrice(abiid string, token string, info *model.GoodPriceInfo){
@@ -167,7 +168,6 @@ func GetGoodPrice(abiid string, token string, info *model.GoodPriceInfo){
 	info.Price = price
 	info.Stock = stock
 	info.Num = num
-	fmt.Println(realprice, price, stock, num)
 }
 
 func GetGoodInfo(abiid string, token string, info *model.GoodPriceInfo){

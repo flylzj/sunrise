@@ -5,3 +5,4 @@ pkg
 github.com
 *.xlsx
 *.exe
+*.json
